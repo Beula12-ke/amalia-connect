@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-ivory text-navy font-sans antialiased;
+  }
+  h1, h2, h3 { @apply font-display tracking-tight; }
+  :focus-visible {
+    @apply outline-none ring-2 ring-gold ring-offset-2 ring-offset-ivory;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-line rounded-card shadow-premium;
+  }
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-premium rounded-2xl;
+  }
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-navy to-gold;
+  }
+  .btn-primary {
+    @apply bg-gold text-navy font-semibold px-4 py-2.5 rounded-lg hover:brightness-95 transition;
+  }
+  .btn-secondary {
+    @apply bg-surface border border-line text-navy font-medium px-4 py-2.5 rounded-lg hover:bg-ivory transition;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold;
+  }
+  .badge-success { @apply badge bg-estate/10 text-estate; }
+  .badge-warning { @apply badge bg-amber/10 text-amber; }
+  .badge-danger  { @apply badge bg-signal/10 text-signal; }
+  .badge-neutral { @apply badge bg-slate/10 text-slate; }
+}
