@@ -12,6 +12,9 @@ export default function Home() {
           {/* Refined Logo: Blend screen applied to remove dark background and enhance gold/ivory visibility */}
           <img src="/logo.png" alt="Amalia Connect" className="h-14 md:h-16 w-auto object-cover object-center mix-blend-screen scale-[1.15] drop-shadow-[0_0_15px_rgba(198,161,91,0.3)] transition-transform hover:scale-[1.2]" />
           <div className="flex gap-4">
+            <Link to="/provider/apply" className="px-5 py-2.5 text-gold hover:text-white font-medium transition-colors hidden md:block">
+              Become a Provider
+            </Link>
             <Link to="/login" className="px-5 py-2.5 text-white hover:text-gold font-medium transition-colors">
               Sign In
             </Link>
@@ -194,7 +197,10 @@ export default function Home() {
       <footer className="bg-navy py-12 text-center border-t border-white/10 relative z-20">
         {/* Refined Logo: Blend screen applied to remove dark background and enhance gold/ivory visibility */}
         <img src="/logo.png" alt="Amalia Connect" className="h-14 md:h-16 w-auto object-cover object-center mix-blend-screen scale-[1.15] drop-shadow-[0_0_15px_rgba(198,161,91,0.3)] transition-transform hover:scale-[1.2]" />
-        <p className="text-white/40 text-sm">© 2026 Amalia Connect. All rights reserved.</p>
+        <p className="text-white/40 text-sm mt-4">© 2026 Amalia Connect. All rights reserved.</p>
+        <p className="mt-4">
+          <Link to="/provider/apply" className="text-gold hover:underline font-medium text-sm">Apply as a Service Provider</Link>
+        </p>
       </footer>
     </div>
   );

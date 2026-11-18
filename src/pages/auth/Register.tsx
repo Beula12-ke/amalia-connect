@@ -81,8 +81,14 @@ export default function Register() {
           <div className="absolute top-1/3 left-1/3 h-64 w-64 rounded-full bg-gold/10 blur-3xl animate-pulse pointer-events-none" />
 
         <div className="relative z-10">
-          {/* Refined Logo: Blend screen applied to remove dark background and enhance gold/ivory visibility */}
-          <img src="/logo.png" alt="Amalia Connect Logo" className="h-14 md:h-16 w-auto object-cover object-center mix-blend-screen scale-[1.15] drop-shadow-[0_0_15px_rgba(198,161,91,0.3)] transition-transform hover:scale-[1.2]" />
+          {/* The Cropped, Blended Logo */}
+          <div className="relative w-64 h-24 mb-4 overflow-hidden mix-blend-screen">
+            <img 
+              src="/logo.png" 
+              alt="Amalia Connect Logo" 
+              className="absolute inset-0 w-full h-full object-cover scale-[1.3] object-center drop-shadow-[0_0_15px_rgba(198,161,91,0.4)]" 
+            />
+          </div>
           <div className="text-xs text-[#d9dce1] mt-1 tracking-widest">
             LIVE SECURE. CONNECT BETTER.
           </div>
@@ -219,9 +225,14 @@ export default function Register() {
               {loading ? "Creating…" : "Create account"}
             </motion.button>
 
-            <motion.p variants={itemVariants} className="text-center text-sm text-slate mt-4">
-              Already have an account? <Link to="/login" className="text-gold font-semibold">Sign in</Link> · <Link to="/visitor-portal" className="text-gold font-semibold">Visitor portal</Link>
-            </motion.p>
+            <motion.div variants={itemVariants} className="text-center text-sm text-slate mt-6 space-y-2">
+              <div>
+                Already have an account? <Link to="/login" className="text-gold font-bold hover:underline">Sign in</Link>
+              </div>
+              <div>
+                Are you a service provider? <Link to="/provider/apply" className="text-navy font-bold hover:underline">Apply here</Link>
+              </div>
+            </motion.div>
           </motion.form>
         </motion.div>
       </div>

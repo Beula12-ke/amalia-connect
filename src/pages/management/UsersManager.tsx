@@ -1,175 +1,177 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
-import { UserCog, Trash2, ShieldOff, Mail, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { motion, AnimatePresence } from "framer-motion";
+import { CheckCircle2, UserX, UserCheck, Link as LinkIcon, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Skeleton } from "@/components/ui/Skeleton";
-import type { AppRole } from "@/types";
 
 export default function UsersManager() {
-  const qc = useQueryClient();
   const { user: currentUser } = useAuth();
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+  const [linkingUser, setLinkingUser] = useState<any>(null);
+  const [selectedUnit, setSelectedUnit] = useState("");
 
+  // Fetch Users
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
+      const { data, error } = await (supabase.from("profiles") as any).select("*").order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return data;
     },
   });
 
-  const isConfirmed = (u: any) => u.email_confirmed_at != null || confirmedIds.has(u.id);
-
-  const updateRole = useMutation({
-    mutationFn: async ({ id, role }: { id: string; role: AppRole }) => {
-      const { error } = await (supabase.from("profiles") as any).update({ role } as any).eq("id", id);
+  // Fetch Units
+  const { data: units } = useQuery({
+    queryKey: ["all-units"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("units") as any).select("*").order("unit_code");
       if (error) throw error;
-      if (role === "service_provider") {
-        await (supabase.from("provider_status") as any).upsert(
-          { provider_id: id, current_status: "offline" },
-          { onConflict: "provider_id" }
-        );
-      }
+      return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
-    onError: (e: any) => setError(e.message),
   });
 
+  // Toggle Active Status
   const toggleActive = useMutation({
-    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      const { error } = await (supabase.from("profiles") as any).update({ is_active } as any).eq("id", id);
+    mutationFn: async ({ id, is_active }: { id: string, is_active: boolean }) => {
+      const { error } = await (supabase.from("profiles") as any).update({ is_active }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+  });
+
+  // Confirm Email
+  const confirmEmail = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase.rpc as any)('admin_confirm_user', { target_user_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+  });
+
+  // Link Unit
+  const linkUnit = useMutation({
+    mutationFn: async () => {
+      if (!linkingUser || !selectedUnit) return;
+      // Remove old links
+      await (supabase.from("resident_units") as any).delete().eq("resident_id", linkingUser.id);
+      // Insert new link
+      const { error } = await (supabase.from("resident_units") as any).insert({
+        resident_id: linkingUser.id,
+        unit_id: selectedUnit,
+        relationship: 'owner'
+      });
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-users"] });
-      qc.invalidateQueries({ queryKey: ["profile"] });
+      setLinkingUser(null);
+      setSelectedUnit("");
+      alert("Unit linked successfully!");
     },
-    onError: (e: any) => setError(e.message),
+    onError: (err: any) => alert(err.message)
   });
-
-  const confirmEmail = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await (supabase.rpc as any)("admin_confirm_user", { target_user_id: id });
-      if (error) throw error;
-    },
-    onSuccess: (_data, id) => {
-      setConfirmedIds((prev) => {
-        const next = new Set(prev);
-        next.add(id);
-        return next;
-      });
-      setError(null);
-      setNotice("Email confirmed successfully.");
-      qc.invalidateQueries({ queryKey: ["admin-users"] });
-      qc.invalidateQueries({ queryKey: ["profile"] });
-      setTimeout(() => setNotice(null), 4000);
-    },
-    onError: (e: any) => setError(e.message),
-  });
-
-  const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("profiles").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users"] }),
-    onError: (e: any) => setError(e.message),
-  });
-
-  if (isLoading) {
-    return (
-      <div className="glass-card p-4 space-y-3">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
-      </div>
-    );
-  }
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-4">
-        <UserCog className="text-gold" />
-        <h1 className="text-2xl">User Management</h1>
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-3xl font-extrabold text-navy">User Management</h1>
+          <p className="text-slate mt-1">Manage residents, staff, roles, and unit assignments.</p>
+        </div>
       </div>
-      {notice && (
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="badge-success mb-4 inline-flex items-center gap-1"
-        >
-          <CheckCircle2 size={14} /> {notice}
-        </motion.div>
-      )}
-      {error && <div className="badge-danger mb-4">{error}</div>}
-      <div className="glass-card p-4 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-slate border-b border-line">
-              <th className="py-2">Name</th>
-              <th className="py-2">Email</th>
-              <th className="py-2">Role</th>
-              <th className="py-2">Status</th>
-              <th className="py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <AnimatePresence>
-              {(users ?? []).map((u: any, i: number) => (
-                <motion.tr key={u.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ delay: i * 0.03 }} className="border-b border-line hover:bg-ivory/50">
-                  <td className="py-2">{u.full_name}</td>
-                  <td className="py-2">{u.email ?? "—"}</td>
-                  <td className="py-2">
-                    <select value={u.role} onChange={(e) => updateRole.mutate({ id: u.id, role: e.target.value as AppRole })} className="border border-line rounded-lg p-1.5 bg-white">
-                      <option value="resident">resident</option>
-                      <option value="security">security</option>
-                      <option value="service_provider">service_provider</option>
-                      <option value="estate_manager">estate_manager</option>
-                      <option value="estate_admin">estate_admin</option>
-                    </select>
+
+      <div className="bg-white rounded-2xl shadow-premium border border-line overflow-hidden">
+        {isLoading ? (
+          <div className="p-10 text-center text-slate">Loading users...</div>
+        ) : (
+          <table className="w-full text-left">
+            <thead className="bg-ivory border-b border-line">
+              <tr>
+                <th className="p-4 text-xs font-bold text-slate uppercase">Name</th>
+                <th className="p-4 text-xs font-bold text-slate uppercase">Role</th>
+                <th className="p-4 text-xs font-bold text-slate uppercase">Status</th>
+                <th className="p-4 text-xs font-bold text-slate uppercase text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users?.map((user: any) => (
+                <tr key={user.id} className="border-b border-line last:border-0 hover:bg-ivory/50 transition-colors">
+                  <td className="p-4">
+                    <div className="font-bold text-navy">{user.full_name}</div>
+                    <div className="text-xs text-slate">{user.email}</div>
                   </td>
-                  <td className="py-2">
-                    <span className={`${u.is_active ? "badge-success" : "badge-neutral"} hover:scale-105 inline-block transition`}>{u.is_active ? "Active" : "Inactive"}</span>
+                  <td className="p-4">
+                    <span className="badge-neutral font-mono text-xs">{user.role}</span>
                   </td>
-                  <td className="py-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {isConfirmed(u) ? (
-                        <span className="inline-flex items-center gap-1 text-estate text-xs font-semibold" title="Email confirmed">
-                          <CheckCircle2 size={16} /> Confirmed
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => confirmEmail.mutate(u.id)}
-                          disabled={confirmEmail.isPending}
-                          className="btn-secondary text-xs inline-flex items-center gap-1 text-estate"
-                        >
-                          <Mail size={14} />
-                          {confirmEmail.isPending && confirmEmail.variables === u.id ? "Confirming…" : "Confirm Email"}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => toggleActive.mutate({ id: u.id, is_active: !u.is_active })}
-                        disabled={toggleActive.isPending || currentUser?.id === u.id}
-                        title={currentUser?.id === u.id ? "Cannot deactivate self" : ""}
-                        className={`btn-secondary text-xs inline-flex items-center gap-1 ${u.is_active ? "text-signal" : "text-estate"}`}
-                      >
-                        <ShieldOff size={14} />
-                        {u.is_active ? "Deactivate" : "Activate"}
+                  <td className="p-4">
+                    {user.email_confirmed_at ? (
+                      <span className="text-estate text-xs font-bold flex items-center gap-1"><CheckCircle2 size={14} /> Confirmed</span>
+                    ) : (
+                      <span className="text-signal text-xs font-bold">Unconfirmed</span>
+                    )}
+                  </td>
+                  <td className="p-4 flex justify-end gap-2">
+                    
+                    {/* Confirm Email Button */}
+                    {!user.email_confirmed_at && (
+                      <button onClick={() => confirmEmail.mutate(user.id)} className="text-xs font-bold bg-gold/10 text-gold px-3 py-1.5 rounded hover:bg-gold hover:text-navy transition">
+                        Confirm
                       </button>
-                      <button onClick={() => remove.mutate(u.id)} className="btn-secondary text-signal text-xs inline-flex items-center gap-1"><Trash2 size={14} />Delete</button>
-                    </div>
+                    )}
+
+                    {/* Link Unit Button (Residents only) */}
+                    {user.role === 'resident' && (
+                      <button onClick={() => setLinkingUser(user)} className="text-xs font-bold bg-navy/10 text-navy px-3 py-1.5 rounded hover:bg-navy hover:text-white transition flex items-center gap-1">
+                        <LinkIcon size={12} /> Unit
+                      </button>
+                    )}
+
+                    {/* Toggle Active Button */}
+                    {user.id !== currentUser?.id && (
+                      <button 
+                        onClick={() => toggleActive.mutate({ id: user.id, is_active: !user.is_active })} 
+                        className={`text-xs font-bold px-3 py-1.5 rounded transition ${user.is_active ? 'bg-signal/10 text-signal hover:bg-signal hover:text-white' : 'bg-estate/10 text-estate hover:bg-estate hover:text-white'}`}
+                      >
+                        {user.is_active ? <UserX size={14} /> : <UserCheck size={14} />}
+                      </button>
+                    )}
+
                   </td>
-                </motion.tr>
+                </tr>
               ))}
-            </AnimatePresence>
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        )}
       </div>
+
+      {/* LINK UNIT MODAL */}
+      <AnimatePresence>
+        {linkingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/80 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex justify-between items-center p-6 border-b border-line">
+                <h2 className="text-xl font-bold text-navy">Link Unit</h2>
+                <button onClick={() => setLinkingUser(null)} className="text-slate hover:text-signal transition"><X size={20} /></button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-slate">Assign a unit to <strong className="text-navy">{linkingUser.full_name}</strong>.</p>
+                <div>
+                  <label className="block text-xs font-bold text-slate mb-2">Select Unit</label>
+                  <select value={selectedUnit} onChange={(e) => setSelectedUnit(e.target.value)} className="w-full border border-line rounded-lg p-3 bg-ivory/50 focus:bg-white focus:ring-2 focus:ring-gold outline-none">
+                    <option value="">-- Choose a unit --</option>
+                    {units?.map((u: any) => (
+                      <option key={u.id} value={u.id}>{u.unit_code} {u.block_name ? `(${u.block_name})` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={() => linkUnit.mutate()} disabled={!selectedUnit || linkUnit.isPending} className="btn-primary w-full flex justify-center items-center gap-2">
+                  {linkUnit.isPending ? <Loader2 size={18} className="animate-spin" /> : <LinkIcon size={18} />} Save Link
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

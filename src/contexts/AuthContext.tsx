@@ -23,27 +23,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setLoading(false);
+    // 1. Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (!session) setLoading(false); // Only stop loading if there is DEFINITELY no session
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-      if (!s) setProfile(null);
+
+    // 2. Listen for login/logout
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) {
+        setProfile(null);
+        setLoading(false);
+      }
     });
-    return () => { mounted = false; sub.subscription.unsubscribe(); };
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (!session?.user) { setProfile(null); return; }
+    if (!session?.user) return;
+
+    // Fetch profile
     supabase
       .from("profiles")
       .select("*")
       .eq("id", session.user.id)
       .single()
-      .then(({ data }) => setProfile(data as Profile | null));
+      .then(({ data }) => {
+        setProfile(data as Profile | null);
+        setLoading(false); // Stop loading ONLY after profile is fetched
+      });
   }, [session?.user?.id]);
 
   const value = useMemo<AuthState>(() => ({

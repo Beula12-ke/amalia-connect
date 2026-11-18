@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -7,6 +7,17 @@ import { AppShell } from "@/components/layout/AppShell";
 import { PageLoader } from "@/components/ui/PageLoader";
 import Home from "@/pages/public/Home";
 import Login from "@/pages/auth/Login";
+import { useAuth } from "@/contexts/AuthContext";
+
+function HomeOrRedirect() {
+  const { user, role, loading } = useAuth();
+  if (loading) return null; // Or your PageLoader
+  if (user && role === 'estate_admin') return <Navigate to="/management" replace />;
+  if (user && role === 'security') return <Navigate to="/gate" replace />;
+  if (user && role === 'service_provider') return <Navigate to="/provider" replace />;
+  if (user && role === 'resident') return <Navigate to="/dashboard" replace />;
+  return <Home />;
+}
 
 const Register = lazy(() => import("@/pages/auth/Register"));
 const Dashboard = lazy(() => import("@/pages/resident/Dashboard"));
@@ -26,6 +37,8 @@ const AuditLogs = lazy(() => import("@/pages/management/AuditLogs"));
 const VisitorOversight = lazy(() => import("@/pages/management/VisitorOversight"));
 const ProviderDashboard = lazy(() => import("@/pages/provider/ProviderDashboard"));
 const VisitorPortal = lazy(() => import("@/pages/public/VisitorPortal"));
+const ProviderApply = lazy(() => import("@/pages/public/ProviderApply"));
+const PendingApproval = lazy(() => import("@/pages/auth/PendingApproval"));
 const UserSettings = lazy(() => import("@/pages/settings/UserSettings"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
@@ -91,8 +104,10 @@ export default function App() {
                 <Route path="/settings" element={<UserSettings />} />
               </Route>
 
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<HomeOrRedirect />} />
               <Route path="/visitor-portal" element={<VisitorPortal />} />
+              <Route path="/provider/apply" element={<ProviderApply />} />
+              <Route path="/pending-approval" element={<PendingApproval />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

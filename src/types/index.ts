@@ -15,4 +15,5 @@ export interface Profile {
   dark_mode: boolean;
   default_visitor_pass_hours: number | null;
   auto_approve_visitors: boolean;
+  service_category: string | null;
 }

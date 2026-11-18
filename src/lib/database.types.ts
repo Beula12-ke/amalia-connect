@@ -19,6 +19,7 @@ export interface Database {
           dark_mode: boolean | null;
           default_visitor_pass_hours: number | null;
           auto_approve_visitors: boolean;
+          service_category: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -37,6 +38,7 @@ export interface Database {
           dark_mode?: boolean | null;
           default_visitor_pass_hours?: number | null;
           auto_approve_visitors?: boolean;
+          service_category?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
       };
@@ -68,6 +70,8 @@ export interface Database {
           status: string;
           checked_in_at: string | null;
           created_at: string;
+          service_request_id: string | null;
+          provider_id: string | null;
         };
         Insert: Partial<Database["public"]["Tables"]["visitors"]["Row"]> & { visitor_name: string; resident_id: string; unit_id: string };
         Update: Partial<Database["public"]["Tables"]["visitors"]["Row"]>;
@@ -83,8 +87,31 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["announcements"]["Row"]>;
       };
       service_requests: {
-        Row: { id: string; resident_id: string; unit_id: string; category: string; title: string; description: string; priority: string; status: string; created_at: string };
-        Insert: { resident_id: string; unit_id: string; category: string; title: string; description: string; priority?: string };
+        Row: { 
+          id: string; 
+          resident_id: string; 
+          unit_id: string; 
+          category: string; 
+          title: string; 
+          description: string; 
+          priority: string; 
+          status: string; 
+          created_at: string;
+          assigned_provider_id: string | null;
+          assigned_at: string | null;
+          estimated_arrival: string | null;
+        };
+        Insert: { 
+          resident_id: string; 
+          unit_id: string; 
+          category: string; 
+          title: string; 
+          description: string; 
+          priority?: string;
+          assigned_provider_id?: string | null;
+          assigned_at?: string | null;
+          estimated_arrival?: string | null;
+        };
         Update: Partial<Database["public"]["Tables"]["service_requests"]["Row"]>;
       };
       access_logs: {
@@ -101,6 +128,16 @@ export interface Database {
         Row: { id: string; action: string; entity_table: string; entity_id: string | null; actor_id: string | null; created_at: string; profiles: { full_name: string; role: string } | null };
         Insert: { action: string; entity_table: string; entity_id?: string | null; actor_id?: string | null };
         Update: Partial<Database["public"]["Tables"]["audit_logs"]["Row"]>;
+      };
+      provider_status: {
+        Row: { id: string; provider_id: string; current_status: string; category: string | null; task_started_at: string | null; updated_at: string; created_at: string };
+        Insert: { provider_id: string; current_status: string; category?: string | null; task_started_at?: string | null };
+        Update: Partial<Database["public"]["Tables"]["provider_status"]["Row"]>;
+      };
+      notifications: {
+        Row: { id: string; user_id: string; type: string; title: string; body: string; read: boolean; created_at: string; data: any | null };
+        Insert: { user_id: string; type: string; title: string; body: string; data?: any | null };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Row"]>;
       };
     };
     Views: {};
