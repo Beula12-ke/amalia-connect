@@ -33,22 +33,32 @@ export default function Login() {
         <ArrowLeft size={18} />
         Back to Home
       </Link>
-      <div className="hidden md:flex flex-col justify-between bg-navy text-white p-10 relative z-10">
-        <div>
-          <img src="/logo.png" alt="Amalia Connect Logo" className="w-56 mb-4 object-contain" />
-          <div className="text-xs text-[#d9dce1] mt-1 tracking-widest">
-            LIVE SECURE. CONNECT BETTER.
+      <div
+        className="hidden md:flex flex-col bg-navy text-white p-10 relative overflow-hidden"
+        style={{
+          backgroundImage: `linear-gradient(to bottom, rgba(16, 36, 58, 0.85), rgba(16, 36, 58, 0.95)), url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2075&auto=format&fit=crop')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        <div className="relative z-10 flex flex-col justify-between flex-1 w-full">
+          <div>
+            {/* Refined Logo: Blend screen applied to remove dark background and enhance gold/ivory visibility */}
+            <img src="/logo.png" alt="Amalia Connect Logo" className="h-14 md:h-16 w-auto object-cover object-center mix-blend-screen scale-[1.15] drop-shadow-[0_0_15px_rgba(198,161,91,0.3)] transition-transform hover:scale-[1.2]" />
+            <div className="text-xs text-[#d9dce1] mt-1 tracking-widest">
+              LIVE SECURE. CONNECT BETTER.
+            </div>
           </div>
+          <div>
+            <h1 className="text-3xl font-semibold max-w-sm leading-tight">
+              Smart estate management for a safer, better community.
+            </h1>
+            <p className="mt-4 text-sm text-[#d6dee7] max-w-md">
+              Pre-authorise visitors, verify at the gate, and stay connected with your estate team.
+            </p>
+          </div>
+          <div className="text-xs text-[#aeb9c7]">Amalia Prestige Estate</div>
         </div>
-        <div>
-          <h1 className="text-3xl font-semibold max-w-sm leading-tight">
-            Smart estate management for a safer, better community.
-          </h1>
-          <p className="mt-4 text-sm text-[#d6dee7] max-w-md">
-            Pre-authorise visitors, verify at the gate, and stay connected with your estate team.
-          </p>
-        </div>
-        <div className="text-xs text-[#aeb9c7]">Amalia Prestige Estate</div>
       </div>
 
       <div className="flex items-center justify-center p-6 relative z-10">

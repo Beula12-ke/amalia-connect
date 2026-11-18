@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, Ban } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const FILTERS = ["all", "approved", "pending", "checked_in"] as const;
 
@@ -31,6 +32,22 @@ export default function VisitorOversight() {
   });
 
   const rows = useMemo(() => (visitors.data ?? []).filter((v: any) => filter === "all" || v.status === filter), [visitors.data, filter]);
+
+  if (visitors.isLoading) {
+    return (
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <Eye className="text-gold" />
+          <h1 className="text-2xl">Visitor Oversight</h1>
+        </div>
+        <div className="glass-card p-4 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

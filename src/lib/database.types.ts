@@ -9,9 +9,16 @@ export interface Database {
           full_name: string;
           phone: string | null;
           email: string | null;
-          role: "resident" | "security" | "estate_manager" | "estate_admin";
+          role: "resident" | "security" | "service_provider" | "estate_manager" | "estate_admin";
           is_active: boolean;
           avatar_url: string | null;
+          notification_email: boolean | null;
+          notification_sms: boolean | null;
+          sound_alerts: boolean | null;
+          hide_phone_from_guard: boolean | null;
+          dark_mode: boolean | null;
+          default_visitor_pass_hours: number | null;
+          auto_approve_visitors: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -20,9 +27,16 @@ export interface Database {
           full_name: string;
           phone?: string | null;
           email?: string | null;
-          role?: "resident" | "security" | "estate_manager" | "estate_admin";
+          role?: "resident" | "security" | "service_provider" | "estate_manager" | "estate_admin";
           is_active?: boolean;
           avatar_url?: string | null;
+          notification_email?: boolean | null;
+          notification_sms?: boolean | null;
+          sound_alerts?: boolean | null;
+          hide_phone_from_guard?: boolean | null;
+          dark_mode?: boolean | null;
+          default_visitor_pass_hours?: number | null;
+          auto_approve_visitors?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
       };
@@ -83,6 +97,11 @@ export interface Database {
         Insert: { raised_by: string; unit_id: string; alert_type: string; description?: string; status?: string };
         Update: Partial<Database["public"]["Tables"]["emergency_alerts"]["Row"]>;
       };
+      audit_logs: {
+        Row: { id: string; action: string; entity_table: string; entity_id: string | null; actor_id: string | null; created_at: string; profiles: { full_name: string; role: string } | null };
+        Insert: { action: string; entity_table: string; entity_id?: string | null; actor_id?: string | null };
+        Update: Partial<Database["public"]["Tables"]["audit_logs"]["Row"]>;
+      };
     };
     Views: {};
     Functions: {
@@ -92,7 +111,7 @@ export interface Database {
       is_resident_of: { Args: { p_unit: string }; Returns: boolean };
     };
     Enums: {
-      app_role: "resident" | "security" | "estate_manager" | "estate_admin";
+      app_role: "resident" | "security" | "service_provider" | "estate_manager" | "estate_admin";
       visitor_status:
         | "pending" | "approved" | "denied"
         | "checked_in" | "checked_out" | "expired" | "cancelled";

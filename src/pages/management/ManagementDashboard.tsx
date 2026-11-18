@@ -1,115 +1,147 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { Bell } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { motion } from "framer-motion";
+import { Users, Shield, Wrench, Activity, ArrowRight, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import type { Database } from "@/lib/database.types";
+
+type AccessLog = Database["public"]["Tables"]["access_logs"]["Row"];
+type Stats = {
+  residents: number;
+  visitorsInside: number;
+  openRequests: number;
+  activeAlerts: number;
+};
 
 export default function ManagementDashboard() {
-  const qc = useQueryClient();
-
-  function enableNotifications() {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }
-  const alerts = useQuery({
-    queryKey: ["emergency_alerts_active"],
+  // Fetch KPIs
+  const { data: stats } = useQuery<Stats>({
+    queryKey: ["admin-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("emergency_alerts").select("*").eq("status", "active");
-      if (error) throw error;
-      return data;
-    },
-  });
-  const ack = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await (supabase.from("emergency_alerts") as any).update({ status: "acknowledged" } as any).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["emergency_alerts_active"] }),
-  });
-
-  const residents = useQuery({
-    queryKey: ["kpi_residents"],
-    queryFn: async () => {
-      const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "resident");
-      return count ?? 0;
-    },
-  });
-  const visitorsToday = useQuery({
-    queryKey: ["kpi_visitors_today"],
-    queryFn: async () => {
-      const start = new Date(); start.setHours(0, 0, 0, 0);
-      const end = new Date(); end.setHours(23, 59, 59, 999);
-      const { count } = await supabase.from("visitors").select("*", { count: "exact", head: true })
-        .gte("expected_at", start.toISOString()).lte("expected_at", end.toISOString());
-      return count ?? 0;
-    },
-  });
-  const openRequests = useQuery({
-    queryKey: ["kpi_open_requests"],
-    queryFn: async () => {
-      const { count } = await supabase.from("service_requests").select("*", { count: "exact", head: true }).neq("status", "resolved");
-      return count ?? 0;
-    },
-  });
-  const logs = useQuery({
-    queryKey: ["recent_access_logs"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("access_logs").select("*").order("occurred_at", { ascending: false }).limit(5);
-      if (error) throw error;
-      return data;
+      const [residents, visitors, requests, alerts] = await Promise.all([
+        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "resident"),
+        supabase.from("visitors").select("*", { count: "exact", head: true }).eq("status", "checked_in"),
+        supabase.from("service_requests").select("*", { count: "exact", head: true }).neq("status", "resolved"),
+        supabase.from("emergency_alerts").select("*", { count: "exact", head: true }).eq("status", "active")
+      ]);
+      return {
+        residents: residents.count || 0,
+        visitorsInside: visitors.count || 0,
+        openRequests: requests.count || 0,
+        activeAlerts: alerts.count || 0,
+      };
     },
   });
 
-  const kpis = [
-    { label: "Total Residents", value: residents.data ?? 0 },
-    { label: "Visitors Today", value: visitorsToday.data ?? 0 },
-    { label: "Open Requests", value: openRequests.data ?? 0 },
-  ];
+  // Fetch Recent Gate Activity
+  const { data: logs } = useQuery<AccessLog[]>({
+    queryKey: ["recent-logs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("access_logs")
+        .select("*")
+        .order("occurred_at", { ascending: false })
+        .limit(6);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl">Estate Management</h1>
-        <button onClick={enableNotifications} className="btn-secondary text-xs inline-flex items-center gap-1">
-          <Bell size={14} />
-          {typeof Notification !== "undefined" && Notification.permission === "granted" ? "Notifications On" : "Enable Notifications"}
-        </button>
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-estate/10 text-estate text-xs font-bold mb-3">
+            <span className="w-2 h-2 rounded-full bg-estate animate-pulse"></span>
+            SYSTEM ONLINE
+          </div>
+          <h1 className="text-3xl font-extrabold text-navy">Estate Command Center</h1>
+          <p className="text-slate mt-1">Overview of your estate's security and operations.</p>
+        </div>
       </div>
-      {(alerts.data ?? []).length > 0 && (
-        <div className="mb-6 space-y-3">
-          {(alerts.data ?? []).map((a: any) => (
-            <motion.div key={a.id} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-5 bg-signal/10 border-signal border-t-4 border-t-signal">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="badge-danger mr-2">{a.alert_type}</span>
-                  <span className="text-sm text-slate">Unit {a.unit_id}</span>
-                </div>
-                <button onClick={() => ack.mutate(a.id)} className="btn-secondary text-signal text-xs">Acknowledge</button>
-              </div>
-              {a.description && <p className="text-sm mt-2">{a.description}</p>}
-            </motion.div>
-          ))}
-        </div>
+
+      {/* EMERGENCY ALERTS BANNER */}
+      {stats && stats.activeAlerts > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="bg-signal/10 border border-signal/30 rounded-2xl p-6 flex items-start gap-4">
+          <ShieldAlert className="text-signal shrink-0" size={28} />
+          <div>
+            <h3 className="text-signal font-bold text-lg">Active Emergency Alerts!</h3>
+            <p className="text-signal/80 text-sm mb-3">There are {stats.activeAlerts} unaddressed emergency alerts in the estate.</p>
+            <Link to="/management/alerts" className="bg-signal text-white px-4 py-2 rounded-lg text-sm font-bold inline-block hover:bg-red-700 transition">View Alerts</Link>
+          </div>
+        </motion.div>
       )}
-      <motion.div initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08 } } }} className="grid sm:grid-cols-3 gap-4 mb-6">
-        {kpis.map((k) => (
-          <motion.div key={k.label} variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }} className="glass-card p-5 border-t-4 border-t-gold">
-            <div className="text-[11px] uppercase text-slate">{k.label}</div>
-            <div className="text-2xl font-extrabold text-navy mt-1">{k.value}</div>
-          </motion.div>
+
+      {/* BENTO KPI GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { title: "Total Residents", value: stats?.residents || 0, icon: Users, color: "text-navy", bg: "bg-navy/5", link: "/management/users" },
+          { title: "Visitors Inside", value: stats?.visitorsInside || 0, icon: Shield, color: "text-estate", bg: "bg-estate/5", link: "/management/visitors" },
+          { title: "Open Requests", value: stats?.openRequests || 0, icon: Wrench, color: "text-amber", bg: "bg-amber/5", link: "/management/services" },
+          { title: "Gate Activity", value: "Live", icon: Activity, color: "text-gold", bg: "bg-gold/5", link: "/gate" },
+        ].map((kpi, i) => (
+          <Link key={i} to={kpi.link}>
+            <motion.div whileHover={{ y: -5, scale: 1.02 }} className="bg-white rounded-2xl shadow-premium p-6 border border-line hover:border-gold/30 transition-all h-full">
+              <div className={`w-12 h-12 ${kpi.bg} rounded-xl flex items-center justify-center mb-4`}>
+                <kpi.icon className={kpi.color} size={24} />
+              </div>
+              <div className="text-slate font-medium text-sm mb-1">{kpi.title}</div>
+              <div className="text-3xl font-extrabold text-navy">{kpi.value}</div>
+            </motion.div>
+          </Link>
         ))}
-      </motion.div>
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-5">
-        <h2 className="text-lg mb-3">Recent Gate Activity</h2>
-        <div className="space-y-2">
-          {(logs.data ?? []).map((l: any) => (
-            <div key={l.id} className="flex justify-between text-sm border-b border-line py-2">
-              <span>{l.visitor_name_snapshot}</span>
-              <span className="text-slate">{l.event_type}</span>
-            </div>
-          ))}
+      </div>
+
+      {/* TWO COLUMN LAYOUT: TIMELINE & QUICK ACTIONS */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* RECENT GATE ACTIVITY (Timeline) */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-premium p-6 border border-line">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-navy">Recent Gate Activity</h2>
+            <Link to="/management/visitors" className="text-gold text-sm font-bold hover:underline">View All</Link>
+          </div>
+          <div className="space-y-4">
+            {logs?.length === 0 && <p className="text-slate text-sm">No recent gate activity.</p>}
+            {logs?.map((log, i) => (
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} key={log.id} className="flex items-start gap-4">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${log.event_type === 'entry_granted' ? 'bg-estate/10 text-estate' : 'bg-slate/10 text-slate'}`}>
+                  <CheckCircle2 size={16} />
+                </div>
+                <div className="flex-1 border-b border-line pb-3">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-navy text-sm">{log.visitor_name_snapshot}</span>
+                    <span className="text-xs text-slate">{new Date(log.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <p className="text-slate text-xs mt-0.5">{log.event_type.replace('_', ' ').toUpperCase()} at {log.gate_name}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </motion.div>
+
+        {/* QUICK ACTIONS */}
+        <div className="bg-white rounded-2xl shadow-premium p-6 border border-line">
+          <h2 className="text-xl font-bold text-navy mb-6">Quick Actions</h2>
+          <div className="space-y-3">
+            {[
+              { label: "Register Visitor", link: "/visitors/new" },
+              { label: "Add Resident", link: "/management/users" },
+              { label: "Publish Notice", link: "/management/announcements" },
+              { label: "View Gate Logs", link: "/gate" }
+            ].map((action, i) => (
+              <Link key={i} to={action.link}>
+                <motion.div whileHover={{ x: 5 }} className="flex items-center justify-between p-4 rounded-xl bg-ivory hover:bg-navy hover:text-white transition-colors group cursor-pointer">
+                  <span className="font-bold text-sm">{action.label}</span>
+                  <ArrowRight size={16} className="text-gold group-hover:text-gold" />
+                </motion.div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

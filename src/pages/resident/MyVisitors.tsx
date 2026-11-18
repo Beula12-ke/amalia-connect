@@ -1,10 +1,24 @@
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { useVisitors } from "@/hooks/useVisitors";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function MyVisitors() {
   const { data: visitors, isLoading } = useVisitors();
-  if (isLoading) return <div className="text-slate">Loading…</div>;
+
+  if (isLoading) {
+    return (
+      <div className="card p-6">
+        <h1 className="text-2xl mb-4">My Visitors</h1>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card p-6">
       <h1 className="text-2xl mb-4">My Visitors</h1>

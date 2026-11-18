@@ -11,7 +11,8 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-navy text-white px-6 py-4 flex items-center justify-between">
-        <img src="/logo.png" alt="Amalia Connect" className="h-12 object-contain" />
+        {/* Refined Logo: Blend screen applied to remove dark background and enhance gold/ivory visibility */}
+        <img src="/logo.png" alt="Amalia Connect" className="h-14 md:h-16 w-auto object-cover object-center mix-blend-screen scale-[1.15] drop-shadow-[0_0_15px_rgba(198,161,91,0.3)] transition-transform hover:scale-[1.2]" loading="lazy" />
         <div className="flex items-center gap-4 text-sm">
           <span className="hidden sm:inline text-[#d9dce1]">{profile?.full_name}</span>
           <button onClick={signOut} className="btn-secondary text-navy">Sign out</button>

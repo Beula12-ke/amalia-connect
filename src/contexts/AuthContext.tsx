@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session?.user) { setProfile(null); return; }
     supabase
       .from("profiles")
-      .select("id, full_name, phone, email, role, is_active, avatar_url")
+      .select("*")
       .eq("id", session.user.id)
       .single()
       .then(({ data }) => setProfile(data as Profile | null));
