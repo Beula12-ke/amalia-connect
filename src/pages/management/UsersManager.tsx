@@ -19,7 +19,7 @@ export default function UsersManager() {
   const [staffRole, setStaffRole] = useState("security");
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading } = useQuery<any[]>({
     queryKey: ["admin-users"],
     queryFn: async () => {
       const { data, error } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
@@ -28,7 +28,7 @@ export default function UsersManager() {
     },
   });
 
-  const { data: units } = useQuery({
+  const { data: units } = useQuery<any[]>({
     queryKey: ["all-units"],
     queryFn: async () => {
       const { data, error } = await supabase.from("units").select("*").order("unit_code");
