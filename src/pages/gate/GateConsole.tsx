@@ -13,7 +13,7 @@ export default function GateConsole() {
   const [searchResult, setSearchResult] = useState<any>(null);
   const [searching, setSearching] = useState(false);
 
-  const { data: pendingVisitors } = useQuery({
+  const { data: pendingVisitors } = useQuery<any[]>({
     queryKey: ["pending-visitors"],
     queryFn: async () => {
       const { data } = await supabase.from("visitors").select("*, units(unit_code), profiles(full_name)").eq("status", "pending").order("created_at", { ascending: true });
@@ -21,7 +21,7 @@ export default function GateConsole() {
     },
   });
 
-  const { data: activeVisitors } = useQuery({
+  const { data: activeVisitors } = useQuery<any[]>({
     queryKey: ["active-visitors"],
     queryFn: async () => {
       const { data } = await supabase.from("visitors").select("*, units(unit_code)").eq("status", "checked_in").order("checked_in_at", { ascending: false });
@@ -29,7 +29,7 @@ export default function GateConsole() {
     },
   });
 
-  const { data: providers } = useQuery({
+  const { data: providers } = useQuery<any[]>({
     queryKey: ["active-providers"],
     queryFn: async () => {
       const { data } = await supabase.from("visitors").select("*, units(unit_code)").eq("status", "approved").eq("visitor_category", "service_provider").order("expected_at", { ascending: true });
@@ -55,15 +55,15 @@ export default function GateConsole() {
   };
 
   const recordEntry = async (visitor: any) => {
-    await supabase.from("visitors").update({ status: "checked_in", checked_in_at: new Date().toISOString() }).eq("id", visitor.id);
-    await supabase.from("access_logs").insert({ visitor_id: visitor.id, unit_id: visitor.unit_id, resident_id: visitor.resident_id, guard_id: user?.id, event_type: "entry_granted", gate_name: "Main Gate", visitor_name_snapshot: visitor.visitor_name });
+    await (supabase as any).from("visitors").update({ status: "checked_in", checked_in_at: new Date().toISOString() }).eq("id", visitor.id);
+    await supabase.from("access_logs").insert({ visitor_id: visitor.id, unit_id: visitor.unit_id, resident_id: visitor.resident_id, guard_id: user?.id, event_type: "entry_granted", gate_name: "Main Gate", visitor_name_snapshot: visitor.visitor_name } as any);
     setSearchResult(null); setPassCode("");
     queryClient.invalidateQueries({ queryKey: ["pending-visitors", "active-visitors", "active-providers"] });
   };
 
   const recordExit = async (visitor: any) => {
-    await supabase.from("visitors").update({ status: "checked_out", checked_out_at: new Date().toISOString() }).eq("id", visitor.id);
-    await supabase.from("access_logs").insert({ visitor_id: visitor.id, unit_id: visitor.unit_id, resident_id: visitor.resident_id, guard_id: user?.id, event_type: "exit_recorded", gate_name: "Main Gate", visitor_name_snapshot: visitor.visitor_name });
+    await (supabase as any).from("visitors").update({ status: "checked_out", checked_out_at: new Date().toISOString() }).eq("id", visitor.id);
+    await supabase.from("access_logs").insert({ visitor_id: visitor.id, unit_id: visitor.unit_id, resident_id: visitor.resident_id, guard_id: user?.id, event_type: "exit_recorded", gate_name: "Main Gate", visitor_name_snapshot: visitor.visitor_name } as any);
     queryClient.invalidateQueries({ queryKey: ["active-visitors"] });
   };
 

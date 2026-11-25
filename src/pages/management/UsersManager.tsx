@@ -39,7 +39,7 @@ export default function UsersManager() {
 
   const toggleActive = useMutation({
     mutationFn: async ({ id, is_active }: { id: string, is_active: boolean }) => {
-      const { error } = await supabase.from("profiles").update({ is_active }).eq("id", id);
+      const { error } = await (supabase as any).from("profiles").update({ is_active } as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
@@ -47,7 +47,7 @@ export default function UsersManager() {
 
   const confirmEmail = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.rpc('admin_confirm_user', { target_user_id: id });
+      const { error } = await supabase.rpc('admin_confirm_user', { target_user_id: id } as any);
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
@@ -57,7 +57,7 @@ export default function UsersManager() {
     mutationFn: async () => {
       if (!linkingUser || !selectedUnit) return;
       await supabase.from("resident_units").delete().eq("resident_id", linkingUser.id);
-      const { error } = await supabase.from("resident_units").insert({ resident_id: linkingUser.id, unit_id: selectedUnit, relationship: 'owner' });
+      const { error } = await supabase.from("resident_units").insert({ resident_id: linkingUser.id, unit_id: selectedUnit, relationship: 'owner' } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -75,8 +75,8 @@ export default function UsersManager() {
         staff_email: staffEmail,
         staff_password: staffPassword,
         staff_name: staffName,
-        staff_role: staffRole
-      });
+        staff_role: staffRole 
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
