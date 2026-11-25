@@ -42,18 +42,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!session?.user) return;
+    if (!session?.user) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
 
-    // Fetch profile
-    supabase
+    let isMounted = true;
+    setLoading(true);
+
+    const query = supabase
       .from("profiles")
       .select("*")
       .eq("id", session.user.id)
-      .single()
-      .then(({ data }) => {
-        setProfile(data as Profile | null);
-        setLoading(false); // Stop loading ONLY after profile is fetched
+      .single() as unknown as Promise<{ data: Profile | null; error: any }>;
+
+    query
+      .then(({ data, error }) => {
+        if (!isMounted) return;
+        if (error) console.error("Profile Fetch Error:", error);
+        setProfile((data as unknown as Profile) || null);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error("Profile Exception:", err);
+        setProfile(null);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
       });
+
+    return () => { isMounted = false; };
   }, [session?.user?.id]);
 
   const value = useMemo<AuthState>(() => ({
