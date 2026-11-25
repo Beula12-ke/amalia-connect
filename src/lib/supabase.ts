@@ -1,12 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// 1. Hardcode the URL (removes the /rest/v1 issue forever)
+const url = "https://ssdryhsaeqzekaemehes.supabase.co";
 
-if (!url || !anonKey) {
-  throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env");
-}
+// 2. Keep the key as an environment variable (or hardcode it if you prefer)
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient<Database>(url, anonKey, {
   auth: {
