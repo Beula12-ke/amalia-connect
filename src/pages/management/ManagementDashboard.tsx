@@ -126,10 +126,9 @@ export default function ManagementDashboard() {
           <h2 className="text-xl font-bold text-navy mb-6">Quick Actions</h2>
           <div className="space-y-3">
             {[
-              { label: "Register Visitor", link: "/visitors/new" },
               { label: "Add Resident", link: "/management/users" },
               { label: "Publish Notice", link: "/management/announcements" },
-              { label: "View Gate Logs", link: "/gate" }
+              { label: "View Gate Logs", link: "/management/visitors" }
             ].map((action, i) => (
               <Link key={i} to={action.link}>
                 <motion.div whileHover={{ x: 5 }} className="flex items-center justify-between p-4 rounded-xl bg-ivory hover:bg-navy hover:text-white transition-colors group cursor-pointer">
@@ -138,6 +137,12 @@ export default function ManagementDashboard() {
                 </motion.div>
               </Link>
             ))}
+            <Link to="/gate" target="_blank">
+              <motion.div whileHover={{ x: 5 }} className="flex items-center justify-between p-4 rounded-xl bg-ivory hover:bg-navy hover:text-white transition-colors group cursor-pointer">
+                <span className="font-bold text-sm">Open Gate Kiosk</span>
+                <ArrowRight size={16} className="text-gold group-hover:text-gold" />
+              </motion.div>
+            </Link>
           </div>
         </div>
 

@@ -15,13 +15,14 @@ const NAV: Record<string, { to: string; label: string; icon: any }[]> = {
   ],
   security: [
     { to: "/gate", label: "Gate Console", icon: Shield },
-    { to: "/settings", label: "Settings", icon: Settings },
   ],
   estate_manager: [
     { to: "/management", label: "Command Center", icon: LayoutDashboard },
-    { to: "/management/visitors", label: "Visitor Oversight", icon: Users },
-    { to: "/management/services", label: "Service Desk", icon: Wrench },
     { to: "/management/users", label: "User Management", icon: Users },
+    { to: "/management/units", label: "Units & Blocks", icon: Building2 },
+    { to: "/management/visitors", label: "Visitor Oversight", icon: Users },
+    { to: "/management/announcements", label: "Announcements", icon: Bell },
+    { to: "/emergency", label: "Emergency Help", icon: ShieldAlert },
     { to: "/settings", label: "Settings", icon: Settings },
   ],
   estate_admin: [
@@ -29,7 +30,9 @@ const NAV: Record<string, { to: string; label: string; icon: any }[]> = {
     { to: "/management/users", label: "User Management", icon: Users },
     { to: "/management/units", label: "Units & Blocks", icon: Building2 },
     { to: "/management/visitors", label: "Visitor Oversight", icon: Users },
+    { to: "/management/announcements", label: "Announcements", icon: Bell },
     { to: "/management/logs", label: "Audit Logs", icon: FileClock },
+    { to: "/emergency", label: "Emergency Help", icon: ShieldAlert },
     { to: "/settings", label: "Settings", icon: Settings },
   ],
   service_provider: [

@@ -1,205 +1,267 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
-import { QrCode, Clock, DoorOpen, LogIn, LogOut, CheckCircle2, Truck, Shield } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-
-type Tab = "scan" | "pending" | "active" | "providers";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
+import { Shield, QrCode, Users, Clock, CheckCircle2, XCircle, Search, Loader2, ArrowRight, Wrench } from "lucide-react";
 
 export default function GateConsole() {
-  const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>("scan");
-  const [code, setCode] = useState("");
-  const [result, setResult] = useState<any>(null);
-  const [status, setStatus] = useState<"idle" | "granted" | "denied">("idle");
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("scan");
+  const [passCode, setPassCode] = useState("");
+  const [searchResult, setSearchResult] = useState<any>(null);
+  const [searching, setSearching] = useState(false);
 
-  const pending = useQuery({
-    queryKey: ["gate_pending"],
+  const { data: pendingVisitors } = useQuery({
+    queryKey: ["pending-visitors"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("visitors").select("*, units(unit_code)").eq("status", "pending").order("created_at", { ascending: false });
-      if (error) throw error; return data ?? [];
+      const { data } = await supabase.from("visitors").select("*, units(unit_code), profiles(full_name)").eq("status", "pending").order("created_at", { ascending: true });
+      return data || [];
     },
   });
-  const active = useQuery({
-    queryKey: ["gate_active"],
+
+  const { data: activeVisitors } = useQuery({
+    queryKey: ["active-visitors"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("visitors").select("*, units(unit_code)").eq("status", "checked_in").order("checked_in_at", { ascending: false });
-      if (error) throw error; return data ?? [];
+      const { data } = await supabase.from("visitors").select("*, units(unit_code)").eq("status", "checked_in").order("checked_in_at", { ascending: false });
+      return data || [];
     },
   });
-  
-  const providers = useQuery({
-    queryKey: ["gate_providers"],
+
+  const { data: providers } = useQuery({
+    queryKey: ["active-providers"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("visitors")
-        .select("*, units(unit_code), service_requests(title)")
-        .eq("visitor_category", "service_provider")
-        .eq("status", "approved")
-        .order("created_at", { ascending: false });
-      if (error) throw error; return data ?? [];
+      const { data } = await supabase.from("visitors").select("*, units(unit_code)").eq("status", "approved").eq("visitor_category", "service_provider").order("expected_at", { ascending: true });
+      return data || [];
     },
   });
 
-  async function verify() {
-    setLoading(true); setResult(null); setStatus("idle");
-    const { data } = await supabase.from("visitors").select("*, units(unit_code)").eq("pass_code", code.trim().toUpperCase()).single();
-    setLoading(false);
-    if (!data || (data as any).status !== "approved") { setStatus("denied"); setResult(data); return; }
-    setStatus("granted"); setResult(data);
-  }
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passCode) return;
+    setSearching(true);
+    setSearchResult(null);
 
-  async function recordEntry() {
-    if (!result) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    await (supabase.from("visitors") as any).update({ status: "checked_in", checked_in_at: new Date().toISOString() } as any).eq("id", result.id);
-    await (supabase.from("access_logs") as any).insert([{ visitor_id: result.id, unit_id: result.unit_id, resident_id: result.resident_id, guard_id: user!.id, event_type: "entry_granted", gate_name: "Main Gate", visitor_name_snapshot: result.visitor_name }] as any);
-    setResult({ ...result, status: "checked_in" }); setStatus("idle"); setCode("");
-    qc.invalidateQueries({ queryKey: ["gate_active"] });
-    qc.invalidateQueries({ queryKey: ["gate_providers"] });
-  }
+    const { data } = await supabase
+      .from("visitors")
+      .select("*, units(unit_code), profiles(full_name)")
+      .eq("pass_code", passCode.toUpperCase())
+      .single();
 
-  const recordProviderEntry = useMutation({
-    mutationFn: async (v: any) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      await (supabase.from("visitors") as any).update({ status: "checked_in", checked_in_at: new Date().toISOString() } as any).eq("id", v.id);
-      await (supabase.from("access_logs") as any).insert([{ visitor_id: v.id, unit_id: v.unit_id, resident_id: v.resident_id, guard_id: user!.id, event_type: "service_provider_entry", gate_name: "Main Gate", visitor_name_snapshot: v.visitor_name }] as any);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["gate_active"] });
-      qc.invalidateQueries({ queryKey: ["gate_providers"] });
-    },
-  });
+    setSearching(false);
+    if (data) setSearchResult(data);
+    else setSearchResult({ error: "Invalid pass code. Not found." });
+  };
 
-  const recordExit = useMutation({
-    mutationFn: async (v: any) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      await (supabase.from("visitors") as any).update({ status: "checked_out" } as any).eq("id", v.id);
-      await (supabase.from("access_logs") as any).insert([{ visitor_id: v.id, unit_id: v.unit_id, resident_id: v.resident_id, guard_id: user!.id, event_type: "exit_recorded", gate_name: "Main Gate", visitor_name_snapshot: v.visitor_name }] as any);
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["gate_active"] }),
-  });
+  const recordEntry = async (visitor: any) => {
+    await supabase.from("visitors").update({ status: "checked_in", checked_in_at: new Date().toISOString() }).eq("id", visitor.id);
+    await supabase.from("access_logs").insert({ visitor_id: visitor.id, unit_id: visitor.unit_id, resident_id: visitor.resident_id, guard_id: user?.id, event_type: "entry_granted", gate_name: "Main Gate", visitor_name_snapshot: visitor.visitor_name });
+    setSearchResult(null); setPassCode("");
+    queryClient.invalidateQueries({ queryKey: ["pending-visitors", "active-visitors", "active-providers"] });
+  };
 
-  const tabs = [
-    { key: "scan" as const, label: "Scan Pass", icon: QrCode },
-    { key: "pending" as const, label: "Pending Walk-ins", icon: Clock },
-    { key: "active" as const, label: "Active Visitors Inside", icon: DoorOpen },
-    { key: "providers" as const, label: "Service Providers", icon: Truck },
+  const recordExit = async (visitor: any) => {
+    await supabase.from("visitors").update({ status: "checked_out", checked_out_at: new Date().toISOString() }).eq("id", visitor.id);
+    await supabase.from("access_logs").insert({ visitor_id: visitor.id, unit_id: visitor.unit_id, resident_id: visitor.resident_id, guard_id: user?.id, event_type: "exit_recorded", gate_name: "Main Gate", visitor_name_snapshot: visitor.visitor_name });
+    queryClient.invalidateQueries({ queryKey: ["active-visitors"] });
+  };
+
+  const TABS = [
+    { id: "scan", label: "Scan Pass", icon: QrCode },
+    { id: "pending", label: "Pending Walk-ins", icon: Clock },
+    { id: "active", label: "Inside Estate", icon: Users },
+    { id: "providers", label: "Providers", icon: Wrench },
   ];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-navy">Gate Console</h1>
-        <span className="badge-neutral text-xs">Security</span>
+    <div className="w-full max-w-[1600px] mx-auto space-y-6 pb-10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-[#0a1524] border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Visitors Inside</div>
+            <div className="text-3xl font-extrabold text-estate mt-1">{activeVisitors?.length || 0}</div>
+          </div>
+          <Users className="text-estate/50" size={32} />
+        </div>
+        <div className="bg-[#0a1524] border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Pending Walk-ins</div>
+            <div className="text-3xl font-extrabold text-amber mt-1">{pendingVisitors?.length || 0}</div>
+          </div>
+          <Clock className="text-amber/50" size={32} />
+        </div>
+        <div className="bg-[#0a1524] border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <div className="text-slate-400 text-xs font-bold uppercase tracking-wider">Providers Expected</div>
+            <div className="text-3xl font-extrabold text-gold mt-1">{providers?.length || 0}</div>
+          </div>
+          <Wrench className="text-gold/50" size={32} />
+        </div>
       </div>
-      <div className="flex gap-2 border-b border-line overflow-x-auto">
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={`relative inline-flex items-center gap-2 px-4 py-2 text-sm whitespace-nowrap ${tab === t.key ? "text-navy font-semibold" : "text-slate"}`}>
-            <t.icon size={16} />{t.label}
-            {tab === t.key && <motion.div layoutId="tab-underline" className="absolute left-0 right-0 -bottom-px h-0.5 bg-gold" />}
+
+      <div className="flex overflow-x-auto gap-2 pb-2">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap relative ${
+              activeTab === tab.id ? 'text-navy' : 'text-white hover:text-gold bg-white/5'
+            }`}
+          >
+            {activeTab === tab.id && (
+              <motion.div layoutId="active-tab" className="absolute inset-0 bg-gold rounded-xl -z-10" />
+            )}
+            <tab.icon size={18} /> {tab.label}
           </button>
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
-        {tab === "scan" && (
-          <motion.div key="scan" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-6">
-            <div className="glass-card p-6">
-              <label className="block text-xs font-bold text-slate mb-1">Pass code</label>
-              <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} className="w-full border border-line rounded-lg p-4 text-2xl font-mono tracking-widest bg-white mb-4" placeholder="ABC123" />
-              <button onClick={verify} disabled={loading || code.length < 6} className="btn-primary w-full">{loading ? "Verifying…" : "Verify Pass"}</button>
-            </div>
-            {status === "granted" && result && (
-              <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-6 bg-estate/10 border-estate shadow-[0_0_30px_rgba(37,132,90,0.25)] text-center">
-                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 18 }}>
-                  <CheckCircle2 size={80} className="text-estate mx-auto mb-2" />
-                </motion.div>
-                <h2 className="text-3xl text-estate font-extrabold mb-2">ACCESS GRANTED</h2>
-                <p className="text-lg font-semibold">{result.visitor_name}</p>
-                <p className="text-slate">{result.units?.unit_code ?? "—"}</p>
-                <button onClick={recordEntry} className="btn-primary mt-4 inline-flex items-center gap-2"><LogIn size={16} />Record Entry</button>
-              </motion.div>
-            )}
-            {status === "denied" && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1, x: [0, -10, 10, -10, 10, 0] }} className="glass-card p-6 bg-signal/10 border-signal text-center">
-                <h2 className="text-3xl text-signal font-extrabold mb-2">ACCESS DENIED</h2>
-                <p className="text-slate">Pass not found, expired, or cancelled.</p>
-              </motion.div>
-            )}
-          </motion.div>
-        )}
-
-        {tab === "pending" && (
-          <motion.div key="pending" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-6">
-            <h2 className="text-xl mb-4 flex items-center gap-2"><Clock size={18} className="text-gold" /> Pending Walk-ins</h2>
-            <div className="space-y-2">
-              {(pending.data ?? []).map((v: any) => (
-                <div key={v.id} className="flex items-center justify-between border-b border-line py-2">
-                  <div><p className="font-medium">{v.visitor_name}</p><p className="text-slate text-xs">{v.units?.unit_code ?? "—"}</p></div>
-                  <span className="badge-warning">{v.status}</span>
-                </div>
-              ))}
-              {!(pending.data ?? []).length && <p className="text-slate text-sm">No pending walk-ins.</p>}
-            </div>
-          </motion.div>
-        )}
-
-        {tab === "active" && (
-          <motion.div key="active" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-6">
-            <h2 className="text-xl mb-4 flex items-center gap-2"><DoorOpen size={18} className="text-estate" /> Active Visitors Inside</h2>
-            <div className="space-y-2">
-              {(active.data ?? []).map((v: any) => (
-                <div key={v.id} className="flex items-center justify-between border-b border-line py-2">
-                  <div><p className="font-medium">{v.visitor_name}</p><p className="text-slate text-xs">{v.units?.unit_code ?? "—"}</p></div>
-                  <button onClick={() => recordExit.mutate(v)} className="btn-secondary text-xs inline-flex items-center gap-1"><LogOut size={14} />Record Exit</button>
-                </div>
-              ))}
-              {!(active.data ?? []).length && <p className="text-slate text-sm">No active visitors.</p>}
-            </div>
-          </motion.div>
-        )}
-
-        {tab === "providers" && (
-          <motion.div key="providers" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-6">
-            <h2 className="text-xl mb-4 flex items-center gap-2"><Truck size={18} className="text-gold" /> Service Providers</h2>
-            <div className="space-y-2">
-              {(providers.data ?? []).map((v: any) => (
-                <div key={v.id} className="border border-line rounded-xl p-4 bg-navy/5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-bold text-navy">{v.visitor_name}</p>
-                        <span className="badge bg-gold/10 text-gold text-xs font-medium px-2 py-0.5 rounded">Service Provider</span>
-                      </div>
-                      <p className="text-sm text-slate mb-1">
-                        Unit: <span className="font-medium text-navy">{v.units?.unit_code ?? "—"}</span>
-                        {v.service_requests && <span className="text-slate ml-2"> · {v.service_requests.title}</span>}
-                      </p>
-                      <p className="text-xs font-mono text-gold/80 bg-gold/10 px-2 py-1 rounded inline-block">Pass: {v.pass_code}</p>
-                    </div>
-                    <button
-                      onClick={() => recordProviderEntry.mutate(v)}
-                      disabled={recordProviderEntry.isPending}
-                      className="btn-primary shrink-0 inline-flex items-center gap-1"
-                    >
-                      {recordProviderEntry.isPending ? <span className="animate-spin">⏳</span> : <LogIn size={14} />} Entry
-                    </button>
+      <div className="min-h-[500px]">
+        <AnimatePresence mode="wait">
+          {activeTab === "scan" && (
+            <motion.div key="scan" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-[#0a1524] border border-white/10 rounded-3xl p-10 flex flex-col items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gold/5 blur-3xl rounded-full" />
+                <div className="relative z-10 w-full max-w-md">
+                  <div className="bg-white/5 p-6 rounded-full mb-6 w-fit mx-auto border border-white/10">
+                    <QrCode size={48} className="text-gold" />
                   </div>
+                  <h2 className="text-2xl font-bold text-white mb-2 text-center">Verify Visitor Pass</h2>
+                  <p className="text-slate-300 mb-8 text-center text-sm font-medium">Enter the 6-character pass code provided by the resident.</p>
+
+                  <form onSubmit={handleSearch} className="w-full flex gap-3 relative">
+                    <motion.div
+                      animate={{ x: ["0%", "100%", "0%"] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      className="absolute top-0 bottom-0 w-1 bg-gold shadow-[0_0_15px_rgba(198,161,91,0.8)] z-20 pointer-events-none opacity-50"
+                    />
+                    <input
+                      type="text"
+                      value={passCode}
+                      onChange={(e) => setPassCode(e.target.value.toUpperCase())}
+                      placeholder="E.G., A1B2C3"
+                      className="flex-1 text-center text-3xl font-mono tracking-[0.3em] uppercase bg-white/5 border border-white/20 text-white rounded-xl p-5 focus:ring-2 focus:ring-gold outline-none transition-all placeholder:text-white/40"
+                      maxLength={6}
+                    />
+                    <button type="submit" disabled={searching || passCode.length < 4} className="bg-gold text-navy px-8 rounded-xl font-bold hover:bg-yellow-500 transition-colors flex items-center justify-center">
+                      {searching ? <Loader2 className="animate-spin" size={24} /> : <Search size={24} />}
+                    </button>
+                  </form>
                 </div>
-              ))}
-              {!(providers.data ?? []).length && (
-                <div className="text-center py-8 text-slate">
-                  <Shield className="mx-auto text-gold/50 mb-2" size={32} />
-                  <p>No service providers waiting for entry.</p>
-                  <p className="text-xs mt-1">Providers appear here after claiming a job.</p>
+              </div>
+
+              <div className="bg-[#0a1524] border border-white/10 rounded-3xl p-6 flex flex-col">
+                <h3 className="text-white font-bold mb-4 flex items-center gap-2"><Clock size={18} className="text-gold"/> Recently Verified</h3>
+                {searchResult ? (
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex-1 flex items-center justify-center">
+                    {searchResult.error ? (
+                      <motion.div animate={{ x: [0, -10, 10, -10, 10, 0] }} className="bg-signal/10 border border-signal/30 rounded-2xl p-8 text-center w-full">
+                        <XCircle size={56} className="text-signal mx-auto mb-4" />
+                        <h3 className="text-2xl font-bold text-signal">Access Denied</h3>
+                        <p className="text-signal/80 mt-2">{searchResult.error}</p>
+                      </motion.div>
+                    ) : (
+                      <motion.div animate={{ boxShadow: ["0 0 0px rgba(37,132,90,0)", "0 0 40px rgba(37,132,90,0.4)", "0 0 0px rgba(37,132,90,0)"] }} transition={{ duration: 2, repeat: Infinity }} className="bg-estate/10 border border-estate/30 rounded-2xl p-8 w-full">
+                        <CheckCircle2 size={56} className="text-estate mx-auto mb-4" />
+                        <h3 className="text-2xl font-bold text-estate text-center mb-6">Access Granted</h3>
+                        <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10 text-center">
+                          <div className="text-xs text-slate-400 uppercase font-bold mb-1">Visitor</div>
+                          <div className="text-2xl font-bold text-white">{searchResult.visitor_name}</div>
+                          <div className="text-sm text-gold mt-2">Visiting: Unit {searchResult.units?.unit_code} ({searchResult.profiles?.full_name})</div>
+                        </div>
+                        <button onClick={() => recordEntry(searchResult)} className="w-full bg-estate text-white py-4 rounded-xl font-bold text-lg hover:bg-green-700 transition-colors shadow-lg shadow-estate/20">
+                          Record Entry
+                        </button>
+                      </motion.div>
+                    )}
+                  </motion.div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
+                    <Shield size={48} className="mb-4 opacity-20" />
+                    <p className="text-slate-400 font-medium">Waiting for scan...</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === "pending" && (
+            <motion.div key="pending" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              {pendingVisitors?.length === 0 ? (
+                <div className="text-center p-16 bg-[#0a1524] rounded-2xl border border-white/10 text-slate-400">No pending walk-ins.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {pendingVisitors?.map((v) => (
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} whileHover={{ scale: 1.02 }} key={v.id} className="bg-[#0a1524] border border-white/10 rounded-2xl p-5 flex flex-col justify-between min-h-[160px]">
+                      <div>
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-bold text-white text-lg">{v.visitor_name}</div>
+                          <span className="w-2 h-2 rounded-full bg-amber animate-ping mt-2"></span>
+                        </div>
+                        <div className="text-sm text-slate-400">Waiting for Unit {v.units?.unit_code}</div>
+                      </div>
+                      <div className="mt-4 badge-warning w-full text-center py-2">Awaiting Resident Approval</div>
+                    </motion.div>
+                  ))}
                 </div>
               )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+
+          {activeTab === "active" && (
+            <motion.div key="active" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              {activeVisitors?.length === 0 ? (
+                <div className="text-center p-16 bg-[#0a1524] rounded-2xl border border-white/10 text-slate-400">No visitors currently inside the estate.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {activeVisitors?.map((v) => (
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} whileHover={{ scale: 1.02 }} key={v.id} className="bg-[#0a1524] border border-white/10 rounded-2xl p-5 flex flex-col justify-between min-h-[180px]">
+                      <div>
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-bold text-white text-lg">{v.visitor_name}</div>
+                          <span className="badge-success">Inside</span>
+                        </div>
+                        <div className="text-sm text-slate-400">Unit {v.units?.unit_code}</div>
+                        <div className="text-xs text-slate-500 mt-1">In: {new Date(v.checked_in_at).toLocaleTimeString()}</div>
+                      </div>
+                      <button onClick={() => recordExit(v)} className="mt-4 w-full bg-white/5 border border-white/10 text-white py-2 rounded-lg font-bold hover:bg-signal hover:border-signal transition-colors flex items-center justify-center gap-2">
+                        Record Exit <ArrowRight size={16} />
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === "providers" && (
+            <motion.div key="providers" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              {providers?.length === 0 ? (
+                <div className="text-center p-16 bg-[#0a1524] rounded-2xl border border-white/10 text-slate-400">No approved service providers expected.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {providers?.map((v) => (
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} whileHover={{ scale: 1.02 }} key={v.id} className="bg-[#0a1524] border border-white/10 rounded-2xl p-5 flex flex-col justify-between min-h-[180px]">
+                      <div>
+                        <div className="font-bold text-white text-lg mb-1">{v.visitor_name}</div>
+                        <div className="text-sm text-slate-400">Assigned to Unit {v.units?.unit_code}</div>
+                        <div className="mt-3 bg-white/5 border border-white/10 rounded-lg p-2 text-center">
+                          <div className="text-[10px] text-slate-400 uppercase tracking-widest mb-1">Pass Code</div>
+                          <div className="font-mono text-xl font-bold text-gold tracking-widest">{v.pass_code}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => recordEntry(v)} className="mt-4 w-full bg-gold text-navy py-2 rounded-lg font-bold hover:bg-yellow-500 transition-colors">
+                        Record Entry
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

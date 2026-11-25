@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
+import GateLayout from "@/components/layout/GateLayout";
 import { PageLoader } from "@/components/ui/PageLoader";
 import Home from "@/pages/public/Home";
 import Login from "@/pages/auth/Login";
@@ -39,8 +40,8 @@ const ProviderDashboard = lazy(() => import("@/pages/provider/ProviderDashboard"
 const VisitorPortal = lazy(() => import("@/pages/public/VisitorPortal"));
 const ProviderApply = lazy(() => import("@/pages/public/ProviderApply"));
 const PendingApproval = lazy(() => import("@/pages/auth/PendingApproval"));
-const UserSettings = lazy(() => import("@/pages/settings/UserSettings"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const UserSettings = lazy(() => import("@/pages/settings/UserSettings"));
 
 const qc = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -57,18 +58,14 @@ export default function App() {
               <Route path="/register" element={<Register />} />
 
               <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={<ProtectedRoute allow={["resident"]}><Dashboard /></ProtectedRoute>} />
                 <Route path="/visitors" element={<MyVisitors />} />
                 <Route path="/visitors/new" element={<AddVisitor />} />
                 <Route path="/visitors/:id/pass" element={<VisitorPass />} />
-                <Route path="/announcements" element={<Announcements />} />
+                <Route path="/announcements" element={<ProtectedRoute allow={["resident"]}><Announcements /></ProtectedRoute>} />
                 <Route path="/services" element={<ServiceRequests />} />
-                <Route path="/emergency" element={<EmergencyHelp />} />
+                <Route path="/emergency" element={<ProtectedRoute allow={["resident", "estate_admin", "estate_manager"]}><EmergencyHelp /></ProtectedRoute>} />
 
-                <Route
-                  path="/gate"
-                  element={<ProtectedRoute allow={["security", "estate_manager", "estate_admin"]}><GateConsole /></ProtectedRoute>}
-                />
                 <Route
                   path="/management"
                   element={<ProtectedRoute allow={["estate_manager", "estate_admin"]}><ManagementDashboard /></ProtectedRoute>}
@@ -76,10 +73,6 @@ export default function App() {
                 <Route
                   path="/management/announcements"
                   element={<ProtectedRoute allow={["estate_manager", "estate_admin"]}><AnnouncementsManager /></ProtectedRoute>}
-                />
-                <Route
-                  path="/management/services"
-                  element={<ProtectedRoute allow={["estate_manager", "estate_admin"]}><ServiceDesk /></ProtectedRoute>}
                 />
                 <Route
                   path="/management/visitors"
@@ -102,6 +95,10 @@ export default function App() {
                   element={<ProtectedRoute allow={["service_provider"]}><ProviderDashboard /></ProtectedRoute>}
                 />
                 <Route path="/settings" element={<UserSettings />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allow={["security", "estate_manager", "estate_admin"]}><GateLayout /></ProtectedRoute>}>
+                <Route path="/gate" element={<GateConsole />} />
               </Route>
 
               <Route path="/" element={<HomeOrRedirect />} />
